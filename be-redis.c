@@ -186,7 +186,7 @@ int be_redis_aclcheck(void *handle, const char *clientid, const char *username, 
 		return BACKEND_ALLOW;
 	}
 	char *query = malloc(strlen(conf->aclquery) + strlen(username) + strlen(topic) + 128);
-	sprintf(query, conf->aclquery, username, topic);
+	sprintf(query, conf->aclquery, username, acc);
 
 
 	r = redisCommand(conf->redis, query, username, acc);
@@ -197,11 +197,29 @@ int be_redis_aclcheck(void *handle, const char *clientid, const char *username, 
 	free(query);
 
 	int answer = 0;
-	if (r->type == REDIS_REPLY_STRING) {
-		int x = atoi(r->str);
-		if (x >= acc)
-			answer = 1;
+	bool bf;
+	if (r->type != REDIS_REPLY_ARRAY) {
+		_log(LOG_NOTICE, "ACL Query does not yield a list");
+		goto aclcheck_out;
 	}
+	for(int i=0;i< r->elements;i++){
+		char *expanded;
+		t_expand(clientid, username, r->element[i]->str, &expanded);
+		if (!(expanded && *expanded)) {
+			continue;
+		}
+		mosquitto_topic_matches_sub(expanded, topic, &bf);
+		free(expanded);
+		_log(LOG_DEBUG, "expanded=%s", expanded);
+		if(!bf){
+			continue;
+		}
+		_log(LOG_DEBUG, " redis: topic_matches(%s, %s) == %d",
+				     expanded, topic, bf);
+		answer=1;
+		break;
+	}
+aclcheck_out:
 	freeReplyObject(r);
 	return (answer) ? BACKEND_ALLOW : BACKEND_DEFER;
 }
