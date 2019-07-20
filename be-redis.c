@@ -89,9 +89,7 @@ void *be_redis_init()
 
 	host = p_stab("host");
 	p = p_stab("port");
-	user = p_stab("user");
-	pass = p_stab("pass");
-	dbname = p_stab("dbname");
+	db = p_stab("dbname");
 	userquery = p_stab("userquery");
 	aclquery = p_stab("aclquery");
 	conf = (struct redis_backend *)malloc(sizeof(struct redis_backend));
