@@ -87,20 +87,13 @@ void *be_redis_init()
 
 	_log(LOG_DEBUG, "}}}} Redis");
 
-	if ((host = p_stab("redis_host")) == NULL)
-		host = "localhost";
-	if ((p = p_stab("redis_port")) == NULL)
-		p = "6379";
-	if ((db = p_stab("redis_db")) == NULL)
-		db = "0";
-	if ((password = p_stab("redis_pass")) == NULL)
-		password = "";
-	if ((userquery = p_stab("redis_userquery")) == NULL) {
-		userquery = "";
-	}
-	if ((aclquery = p_stab("redis_aclquery")) == NULL) {
-		aclquery = "";
-	}
+	host = p_stab("host");
+	p = p_stab("port");
+	user = p_stab("user");
+	pass = p_stab("pass");
+	dbname = p_stab("dbname");
+	userquery = p_stab("userquery");
+	aclquery = p_stab("aclquery");
 	conf = (struct redis_backend *)malloc(sizeof(struct redis_backend));
 	if (conf == NULL)
 		_fatal("Out of memory");
