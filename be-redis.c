@@ -179,46 +179,44 @@ int be_redis_aclcheck(void *handle, const char *clientid, const char *username, 
 
 	redisReply *r;
 
+	int answer = 0;
+	bool bf;
+
 	if (conf == NULL || conf->redis == NULL || username == NULL)
 		return BACKEND_DEFER;
 
 	if (strlen(conf->aclquery) == 0) {
 		return BACKEND_ALLOW;
 	}
-	char *query = malloc(strlen(conf->aclquery) + strlen(username) + strlen(topic) + 128);
-	sprintf(query, conf->aclquery, username, acc);
+        char *query = malloc(strlen(conf->aclquery) + strlen(username) + strlen(topic) + 128);
+        sprintf(query, conf->aclquery, username, acc);
 
-
-	r = redisCommand(conf->redis, query, username, acc);
-	if (r == NULL || conf->redis->err != REDIS_OK) {
-		be_redis_reconnect(conf);
-		return BACKEND_ERROR;
-	}
-	free(query);
-
-	int answer = 0;
-	bool bf;
-	if (r->type != REDIS_REPLY_ARRAY) {
-		_log(LOG_NOTICE, "ACL Query does not yield a list");
-		goto aclcheck_out;
-	}
-	for(int i=0;i< r->elements;i++){
-		char *expanded;
-		t_expand(clientid, username, r->element[i]->str, &expanded);
-		if (!(expanded && *expanded)) {
-			continue;
-		}
-		mosquitto_topic_matches_sub(expanded, topic, &bf);
-		free(expanded);
-		_log(LOG_DEBUG, "expanded=%s", expanded);
-		if(!bf){
-			continue;
-		}
-		_log(LOG_DEBUG, " redis: topic_matches(%s, %s) == %d",
-				     expanded, topic, bf);
-		answer=1;
-		break;
-	}
+        r = redisCommand(conf->redis, query, username, acc);
+        free(query);
+        if (r == NULL || conf->redis->err != REDIS_OK) {
+            be_redis_reconnect(conf);
+            return BACKEND_ERROR;
+        }
+        if (r->type != REDIS_REPLY_ARRAY) {
+            _log(LOG_NOTICE, "ACL Query does not yield a list");
+            goto aclcheck_out;
+        }
+        for (int i = 0; i < r->elements; i++) {
+            char *expanded;
+            t_expand(clientid, username, r->element[i]->str, &expanded);
+            if (!(expanded && *expanded)) {
+                continue;
+            }
+            mosquitto_topic_matches_sub(expanded, topic, &bf);
+            if (!(bf || (strcmp(expanded, topic) == 0))) {
+                free(expanded);
+                continue;
+            }
+            _log(LOG_DEBUG, " redis: topic_matches(%s, %s) == %d", expanded, topic, bf);
+            free(expanded);
+            answer = 1;
+            break;
+        }
 aclcheck_out:
 	freeReplyObject(r);
 	return (answer) ? BACKEND_ALLOW : BACKEND_DEFER;
